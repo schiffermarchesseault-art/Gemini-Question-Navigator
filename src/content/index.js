@@ -253,6 +253,10 @@
     });
     observer.start();
 
+    window.setTimeout(() => syncMessagesToPanel(), 2000);
+    window.setTimeout(() => syncMessagesToPanel(), 5000);
+    window.setTimeout(() => syncMessagesToPanel(), 10000);
+
     watchUrlChange();
     setupKeyboardShortcut();
   }
