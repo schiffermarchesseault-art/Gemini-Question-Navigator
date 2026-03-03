@@ -63,7 +63,9 @@
     const payload = {
       collapsed: panel.state.collapsed,
       autoFollow: panel.state.autoFollow,
-      panelWidth: panel.panelWidth
+      panelWidth: panel.panelWidth,
+      panelTop: panel.panelTop,
+      panelHeight: panel.panelHeight
     };
     chrome.storage.local.set({ [SETTINGS_KEY]: payload }, () => void chrome.runtime?.lastError);
   }
@@ -226,6 +228,12 @@
     panel.state.autoFollow = settings.autoFollow !== false;
     if (settings.panelWidth > 0) {
       panel.panelWidth = settings.panelWidth;
+    }
+    if (settings.panelTop > 0) {
+      panel.panelTop = settings.panelTop;
+    }
+    if (settings.panelHeight > 0) {
+      panel.panelHeight = settings.panelHeight;
     }
     if (panel.autoFollowToggle) {
       panel.autoFollowToggle.checked = panel.state.autoFollow;

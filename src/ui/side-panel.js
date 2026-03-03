@@ -55,6 +55,8 @@
       this.currentHoverId = null;
 
       this.panelWidth = 240;
+      this.panelTop = 72;
+      this.panelHeight = 0;
 
       this.host = null;
       this.shadowRoot = null;
@@ -71,7 +73,9 @@
       this.noResultsState = null;
       this.shortcutHint = null;
       this.collapsedTab = null;
-      this.resizeHandle = null;
+      this.resizeLeft = null;
+      this.resizeTop = null;
+      this.resizeBottom = null;
     }
 
     async mount() {
@@ -152,10 +156,19 @@
       wrapper.setAttribute("data-collapsed", String(this.state.collapsed));
       this.wrapper = wrapper;
 
-      this.resizeHandle = document.createElement("div");
-      this.resizeHandle.className = "gqn-resize-handle";
-      this.setupResizeHandle();
-      wrapper.appendChild(this.resizeHandle);
+      this.resizeLeft = document.createElement("div");
+      this.resizeLeft.className = "gqn-resize-handle gqn-resize-left";
+      wrapper.appendChild(this.resizeLeft);
+
+      this.resizeTop = document.createElement("div");
+      this.resizeTop.className = "gqn-resize-handle gqn-resize-top";
+      wrapper.appendChild(this.resizeTop);
+
+      this.resizeBottom = document.createElement("div");
+      this.resizeBottom.className = "gqn-resize-handle gqn-resize-bottom";
+      wrapper.appendChild(this.resizeBottom);
+
+      this.setupResizeHandles();
 
       this.collapsedTab = document.createElement("div");
       this.collapsedTab.className = "gqn-collapsed-tab";
@@ -280,36 +293,73 @@
       this.render();
     }
 
-    setupResizeHandle() {
-      let startX = 0;
-      let startWidth = 0;
+    setupResizeHandles() {
+      const self = this;
 
-      const onMouseMove = (e) => {
-        const dx = startX - e.clientX;
-        const newWidth = Math.max(160, Math.min(window.innerWidth * 0.5, startWidth + dx));
-        this.panelWidth = newWidth;
-        this.wrapper.style.setProperty("--gqn-width", `${newWidth}px`);
-      };
+      function attachDrag(handle, cursorStyle, onMove, onEnd) {
+        handle.addEventListener("mousedown", (e) => {
+          e.preventDefault();
+          const startX = e.clientX;
+          const startY = e.clientY;
+          handle.classList.add("gqn-resizing");
+          document.body.style.cursor = cursorStyle;
+          document.body.style.userSelect = "none";
 
-      const onMouseUp = () => {
-        document.removeEventListener("mousemove", onMouseMove);
-        document.removeEventListener("mouseup", onMouseUp);
-        this.resizeHandle.classList.remove("gqn-resizing");
-        document.body.style.cursor = "";
-        document.body.style.userSelect = "";
-        this.renderVirtualizedItems();
-      };
+          const move = (ev) => onMove(ev, startX, startY);
+          const up = () => {
+            document.removeEventListener("mousemove", move);
+            document.removeEventListener("mouseup", up);
+            handle.classList.remove("gqn-resizing");
+            document.body.style.cursor = "";
+            document.body.style.userSelect = "";
+            if (onEnd) onEnd();
+          };
+          document.addEventListener("mousemove", move);
+          document.addEventListener("mouseup", up);
+        });
+      }
 
-      this.resizeHandle.addEventListener("mousedown", (e) => {
-        e.preventDefault();
-        startX = e.clientX;
-        startWidth = this.panelWidth;
-        this.resizeHandle.classList.add("gqn-resizing");
-        document.body.style.cursor = "ew-resize";
-        document.body.style.userSelect = "none";
-        document.addEventListener("mousemove", onMouseMove);
-        document.addEventListener("mouseup", onMouseUp);
+      const startWidth = () => this.panelWidth;
+      const startTop = () => this.panelTop;
+      const startHeight = () => this.panelHeight || this.wrapper.offsetHeight;
+
+      attachDrag(this.resizeLeft, "ew-resize", (e, sx) => {
+        const dx = sx - e.clientX;
+        const w = Math.max(160, Math.min(window.innerWidth * 0.5, startWidth() + dx));
+        this.panelWidth = w;
+        this.wrapper.style.setProperty("--gqn-width", `${w}px`);
+      }, () => { this.renderVirtualizedItems(); });
+
+      let cachedStartTop = 72;
+      let cachedStartH = 0;
+
+      this.resizeTop.addEventListener("mousedown", () => {
+        cachedStartTop = this.panelTop;
+        cachedStartH = this.panelHeight || this.wrapper.offsetHeight;
       });
+      attachDrag(this.resizeTop, "ns-resize", (e, _sx, sy) => {
+        const dy = e.clientY - sy;
+        const newTop = Math.max(8, cachedStartTop + dy);
+        const newH = Math.max(200, cachedStartH - dy);
+        this.panelTop = newTop;
+        this.panelHeight = newH;
+        this.wrapper.style.setProperty("--gqn-top", `${newTop}px`);
+        this.wrapper.style.setProperty("--gqn-height", `${newH}px`);
+        this.wrapper.style.setProperty("--gqn-max-height", `${newH}px`);
+      }, () => { this.renderVirtualizedItems(); });
+
+      let cachedBottomH = 0;
+      this.resizeBottom.addEventListener("mousedown", () => {
+        cachedBottomH = this.panelHeight || this.wrapper.offsetHeight;
+      });
+      attachDrag(this.resizeBottom, "ns-resize", (e, _sx, sy) => {
+        const dy = e.clientY - sy;
+        const maxH = window.innerHeight - this.panelTop - 16;
+        const newH = Math.max(200, Math.min(maxH, cachedBottomH + dy));
+        this.panelHeight = newH;
+        this.wrapper.style.setProperty("--gqn-height", `${newH}px`);
+        this.wrapper.style.setProperty("--gqn-max-height", `${newH}px`);
+      }, () => { this.renderVirtualizedItems(); });
     }
 
     startClockRefresh() {
@@ -362,7 +412,9 @@
       panel.style.setProperty("--gqn-width", `${this.panelWidth}px`);
 
       const expandedEls = [
-        this.resizeHandle,
+        this.resizeLeft,
+        this.resizeTop,
+        this.resizeBottom,
         this.shadowRoot.querySelector(".gqn-header"),
         this.searchInput?.closest(".gqn-search-row"),
         this.filterTabAll?.closest(".gqn-filter-row"),
@@ -382,7 +434,17 @@
       for (const el of expandedEls) {
         if (el) el.style.display = "";
       }
-      this.resizeHandle.style.display = "block";
+      this.resizeLeft.style.display = "block";
+      this.resizeTop.style.display = "block";
+      this.resizeBottom.style.display = "block";
+
+      if (this.panelTop) {
+        panel.style.setProperty("--gqn-top", `${this.panelTop}px`);
+      }
+      if (this.panelHeight > 0) {
+        panel.style.setProperty("--gqn-height", `${this.panelHeight}px`);
+        panel.style.setProperty("--gqn-max-height", `${this.panelHeight}px`);
+      }
 
       const hasMessages = this.state.messages.length > 0;
       this.emptyState.style.display = hasMessages ? "none" : "block";

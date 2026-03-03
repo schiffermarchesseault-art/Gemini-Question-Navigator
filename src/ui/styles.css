@@ -1,11 +1,12 @@
 .gqn-panel {
   position: fixed;
   right: 16px;
-  top: 72px;
+  top: var(--gqn-top, 72px);
   width: var(--gqn-width, 240px);
   min-width: 160px;
   max-width: 50vw;
-  max-height: 76vh;
+  height: var(--gqn-height, auto);
+  max-height: var(--gqn-max-height, 76vh);
   background: #111827;
   color: #f9fafb;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -48,14 +49,9 @@
   display: block;
 }
 
-/* Resize handle on left edge */
+/* Resize handles */
 .gqn-resize-handle {
   position: absolute;
-  left: -4px;
-  top: 0;
-  bottom: 0;
-  width: 8px;
-  cursor: ew-resize;
   z-index: 10;
 }
 
@@ -63,6 +59,32 @@
 .gqn-resize-handle.gqn-resizing {
   background: rgba(96, 165, 250, 0.3);
   border-radius: 4px;
+}
+
+.gqn-resize-left {
+  left: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: ew-resize;
+}
+
+.gqn-resize-top {
+  top: -4px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: ns-resize;
+  border-radius: 8px 8px 0 0;
+}
+
+.gqn-resize-bottom {
+  bottom: -4px;
+  left: 0;
+  right: 0;
+  height: 8px;
+  cursor: ns-resize;
+  border-radius: 0 0 8px 8px;
 }
 
 .gqn-header {
@@ -115,8 +137,8 @@
 .gqn-list {
   overflow: auto;
   position: relative;
-  min-height: 180px;
-  max-height: calc(76vh - 44px);
+  flex: 1 1 auto;
+  min-height: 60px;
 }
 
 .gqn-spacer {
