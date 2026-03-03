@@ -143,11 +143,46 @@
     });
   }
 
+  function removeAncestorDuplicates(elements) {
+    const set = new Set(elements);
+    const result = [];
+    for (const el of elements) {
+      let dominated = false;
+      let parent = el.parentElement;
+      while (parent) {
+        if (set.has(parent)) {
+          dominated = true;
+          break;
+        }
+        parent = parent.parentElement;
+      }
+      if (!dominated) {
+        result.push(el);
+      }
+    }
+    return result;
+  }
+
+  function removeTextDuplicates(elements) {
+    const seen = new Set();
+    const result = [];
+    for (const el of elements) {
+      const text = extractCandidateText(el);
+      if (!text) continue;
+      const key = text.slice(0, 200);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      result.push(el);
+    }
+    return result;
+  }
+
   function collectUserMessageElements(root = document) {
     const direct = collectByDirectSelectors(root);
     const fallback = direct.length > 0 ? [] : collectByHeuristics(root);
     const merged = new Set([...direct, ...fallback]);
-    return stableSortByDocumentOrder([...merged]);
+    const sorted = stableSortByDocumentOrder([...merged]);
+    return removeTextDuplicates(removeAncestorDuplicates(sorted));
   }
 
   globalState.selectors = {
