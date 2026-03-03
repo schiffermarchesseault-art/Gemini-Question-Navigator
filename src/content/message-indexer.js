@@ -112,7 +112,20 @@
       for (const element of elements) {
         this.ingestElement(element, now);
       }
+      this.sortByDocumentOrder();
       return this.getMessages();
+    }
+
+    sortByDocumentOrder() {
+      this.messages.sort((a, b) => {
+        const elA = this.idToElement.get(a.id);
+        const elB = this.idToElement.get(b.id);
+        if (!elA || !elB || elA === elB) return 0;
+        const pos = elA.compareDocumentPosition(elB);
+        if (pos & Node.DOCUMENT_POSITION_FOLLOWING) return -1;
+        if (pos & Node.DOCUMENT_POSITION_PRECEDING) return 1;
+        return 0;
+      });
     }
   }
 
