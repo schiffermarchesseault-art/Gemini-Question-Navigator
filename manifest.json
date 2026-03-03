@@ -1,0 +1,53 @@
+{
+  "manifest_version": 3,
+  "name": "Gemini Question Navigator",
+  "version": "0.2.0",
+  "description": "在 Gemini 对话页右侧导航用户提问，支持预览、一键跳转、搜索过滤和收藏。",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "commands": {
+    "toggle-sidebar": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+Q",
+        "mac": "MacCtrl+Shift+Q"
+      },
+      "description": "切换提问导航侧栏"
+    }
+  },
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://gemini.google.com/*",
+        "https://*.gemini.google.com/*"
+      ],
+      "js": [
+        "src/utils/selectors.js",
+        "src/content/message-indexer.js",
+        "src/ui/side-panel.js",
+        "src/content/observer.js",
+        "src/content/index.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/ui/styles.css"
+      ],
+      "matches": [
+        "https://gemini.google.com/*",
+        "https://*.gemini.google.com/*"
+      ]
+    }
+  ]
+}
