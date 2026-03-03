@@ -156,17 +156,18 @@
       wrapper.setAttribute("data-collapsed", String(this.state.collapsed));
       this.wrapper = wrapper;
 
-      this.resizeLeft = document.createElement("div");
-      this.resizeLeft.className = "gqn-resize-handle gqn-resize-left";
-      wrapper.appendChild(this.resizeLeft);
-
-      this.resizeTop = document.createElement("div");
-      this.resizeTop.className = "gqn-resize-handle gqn-resize-top";
-      wrapper.appendChild(this.resizeTop);
-
-      this.resizeBottom = document.createElement("div");
-      this.resizeBottom.className = "gqn-resize-handle gqn-resize-bottom";
-      wrapper.appendChild(this.resizeBottom);
+      this.resizeLeft = this.createResizeBar(wrapper, {
+        position: "absolute", left: "-5px", top: "0", bottom: "0",
+        width: "10px", cursor: "ew-resize", zIndex: "10"
+      });
+      this.resizeTop = this.createResizeBar(wrapper, {
+        position: "absolute", top: "-5px", left: "12px", right: "12px",
+        height: "10px", cursor: "ns-resize", zIndex: "10"
+      });
+      this.resizeBottom = this.createResizeBar(wrapper, {
+        position: "absolute", bottom: "-5px", left: "12px", right: "12px",
+        height: "10px", cursor: "ns-resize", zIndex: "10"
+      });
 
       this.setupResizeHandles();
 
@@ -288,78 +289,91 @@
       this.filterTabBookmarked.setAttribute("data-active", String(this.state.filterMode === "bookmarked"));
     }
 
+    createResizeBar(parent, styles) {
+      const el = document.createElement("div");
+      Object.assign(el.style, styles);
+      el.addEventListener("mouseenter", () => {
+        el.style.background = "rgba(96, 165, 250, 0.35)";
+      });
+      el.addEventListener("mouseleave", () => {
+        if (!el.dataset.dragging) el.style.background = "";
+      });
+      parent.appendChild(el);
+      return el;
+    }
+
     toggleCollapse() {
       this.state.collapsed = !this.state.collapsed;
       this.render();
     }
 
     setupResizeHandles() {
-      const self = this;
-
-      function attachDrag(handle, cursorStyle, onMove, onEnd) {
+      const makeDraggable = (handle, cursor, onStart, onDrag, onDone) => {
         handle.addEventListener("mousedown", (e) => {
           e.preventDefault();
-          const startX = e.clientX;
-          const startY = e.clientY;
-          handle.classList.add("gqn-resizing");
-          document.body.style.cursor = cursorStyle;
-          document.body.style.userSelect = "none";
+          e.stopPropagation();
+          const origin = { x: e.clientX, y: e.clientY };
+          const snap = onStart();
+          handle.dataset.dragging = "1";
+          handle.style.background = "rgba(96, 165, 250, 0.5)";
 
-          const move = (ev) => onMove(ev, startX, startY);
-          const up = () => {
-            document.removeEventListener("mousemove", move);
-            document.removeEventListener("mouseup", up);
-            handle.classList.remove("gqn-resizing");
-            document.body.style.cursor = "";
-            document.body.style.userSelect = "";
-            if (onEnd) onEnd();
+          const pageDoc = this.host.ownerDocument;
+          pageDoc.body.style.cursor = cursor;
+          pageDoc.body.style.userSelect = "none";
+
+          const onMove = (ev) => {
+            ev.preventDefault();
+            onDrag(ev.clientX - origin.x, ev.clientY - origin.y, snap);
           };
-          document.addEventListener("mousemove", move);
-          document.addEventListener("mouseup", up);
+          const onUp = () => {
+            pageDoc.removeEventListener("mousemove", onMove, true);
+            pageDoc.removeEventListener("mouseup", onUp, true);
+            pageDoc.body.style.cursor = "";
+            pageDoc.body.style.userSelect = "";
+            delete handle.dataset.dragging;
+            handle.style.background = "";
+            if (onDone) onDone();
+          };
+          pageDoc.addEventListener("mousemove", onMove, true);
+          pageDoc.addEventListener("mouseup", onUp, true);
         });
-      }
+      };
 
-      const startWidth = () => this.panelWidth;
-      const startTop = () => this.panelTop;
-      const startHeight = () => this.panelHeight || this.wrapper.offsetHeight;
+      makeDraggable(this.resizeLeft, "ew-resize",
+        () => ({ w: this.panelWidth }),
+        (dx, _dy, snap) => {
+          const w = Math.max(160, Math.min(window.innerWidth * 0.5, snap.w - dx));
+          this.panelWidth = w;
+          this.wrapper.style.setProperty("--gqn-width", `${w}px`);
+        },
+        () => this.renderVirtualizedItems()
+      );
 
-      attachDrag(this.resizeLeft, "ew-resize", (e, sx) => {
-        const dx = sx - e.clientX;
-        const w = Math.max(160, Math.min(window.innerWidth * 0.5, startWidth() + dx));
-        this.panelWidth = w;
-        this.wrapper.style.setProperty("--gqn-width", `${w}px`);
-      }, () => { this.renderVirtualizedItems(); });
+      makeDraggable(this.resizeTop, "ns-resize",
+        () => ({ t: this.panelTop, h: this.panelHeight || this.wrapper.offsetHeight }),
+        (_dx, dy, snap) => {
+          const newTop = Math.max(8, snap.t + dy);
+          const newH = Math.max(200, snap.h - dy);
+          this.panelTop = newTop;
+          this.panelHeight = newH;
+          this.wrapper.style.setProperty("--gqn-top", `${newTop}px`);
+          this.wrapper.style.setProperty("--gqn-height", `${newH}px`);
+          this.wrapper.style.setProperty("--gqn-max-height", `${newH}px`);
+        },
+        () => this.renderVirtualizedItems()
+      );
 
-      let cachedStartTop = 72;
-      let cachedStartH = 0;
-
-      this.resizeTop.addEventListener("mousedown", () => {
-        cachedStartTop = this.panelTop;
-        cachedStartH = this.panelHeight || this.wrapper.offsetHeight;
-      });
-      attachDrag(this.resizeTop, "ns-resize", (e, _sx, sy) => {
-        const dy = e.clientY - sy;
-        const newTop = Math.max(8, cachedStartTop + dy);
-        const newH = Math.max(200, cachedStartH - dy);
-        this.panelTop = newTop;
-        this.panelHeight = newH;
-        this.wrapper.style.setProperty("--gqn-top", `${newTop}px`);
-        this.wrapper.style.setProperty("--gqn-height", `${newH}px`);
-        this.wrapper.style.setProperty("--gqn-max-height", `${newH}px`);
-      }, () => { this.renderVirtualizedItems(); });
-
-      let cachedBottomH = 0;
-      this.resizeBottom.addEventListener("mousedown", () => {
-        cachedBottomH = this.panelHeight || this.wrapper.offsetHeight;
-      });
-      attachDrag(this.resizeBottom, "ns-resize", (e, _sx, sy) => {
-        const dy = e.clientY - sy;
-        const maxH = window.innerHeight - this.panelTop - 16;
-        const newH = Math.max(200, Math.min(maxH, cachedBottomH + dy));
-        this.panelHeight = newH;
-        this.wrapper.style.setProperty("--gqn-height", `${newH}px`);
-        this.wrapper.style.setProperty("--gqn-max-height", `${newH}px`);
-      }, () => { this.renderVirtualizedItems(); });
+      makeDraggable(this.resizeBottom, "ns-resize",
+        () => ({ h: this.panelHeight || this.wrapper.offsetHeight }),
+        (_dx, dy, snap) => {
+          const maxH = window.innerHeight - this.panelTop - 16;
+          const newH = Math.max(200, Math.min(maxH, snap.h + dy));
+          this.panelHeight = newH;
+          this.wrapper.style.setProperty("--gqn-height", `${newH}px`);
+          this.wrapper.style.setProperty("--gqn-max-height", `${newH}px`);
+        },
+        () => this.renderVirtualizedItems()
+      );
     }
 
     startClockRefresh() {
